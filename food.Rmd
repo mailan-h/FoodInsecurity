@@ -1,0 +1,133 @@
+
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+#install.packages("rpart")
+library(rpart)
+#install.packages("rpart.plot")
+library(rpart.plot)
+```
+
+## R Markdown
+
+```{r}
+
+# Clear All Variables & Clear Screen
+rm(list=ls())
+cat("\014")
+```
+```{r}
+# Read in the Data
+setwd("C:/Users/HUE/Desktop/Medium")
+food = read.csv("food.csv")
+```
+
+```{r}
+#Explore the data set
+food$agriculture_land_per_capita_14_20 = as.numeric(food$agriculture_land_per_capita_14_20)
+#food$population_change_00_21 = as.numeric(food$population_change_00_21)
+#food$percent_rural_21 = as.numeric(food$percent_rural_21)
+#food$forest_change_90_20 = as.numeric(food$forest_change_90_20)
+str(food)
+summary(food)
+```
+
+
+```{r}
+# Normalization
+
+library(ggplot2)
+library(caret)
+completefood <- na.omit(food) 
+preproc = preProcess(completefood)
+foodNorm = predict(preproc, completefood)
+summary(foodNorm)
+
+# Double check the results of normalization
+#apply(foodNorm,2, mean)
+#apply(foodNorm,2, sd)
+
+```
+
+```{r}
+distances = dist(foodNorm[,-1], method="euclidean") # Calculate all pairwise distances between movies
+clusterfood = hclust(distances, method="ward.D") # Ward uses centroid distances between clusters
+plot(clusterfood) # Dendrogram
+```
+
+```{r}
+clusterGroups = cutree(clusterfood, k=5) #Extract clusters 
+tapply(completefood$food_insecurity_14_21, clusterGroups, mean)
+table(clusterGroups)
+```
+
+```{r}
+
+# Examination of results
+table(clusterGroups) # count number of observations in each cluster
+
+# Calculate mean values (cluster centroids) of all variables using unnormalized data
+#tapply(completefood$food_insecurity_19_21, clusterGroups, mean)
+
+# Alternative way to calculate mean values of all variables by cluster
+summary = aggregate(completefood[, -1], list(clusterGroups), mean)
+summary[order(-summary$food_insecurity_14_21),]
+write.csv(summary, "summary.csv")
+
+```
+
+```{r}
+completefood$clusterGroups <- clusterGroups
+completefood[completefood$clusterGroups == 4,]
+```
+
+```{r}
+numFood <- completefood[, 2:10]
+cor(numFood)
+```
+
+
+```{r}
+lm1 <- lm(food_insecurity_14_21 ~., data=numFood)
+summary(lm1)
+```
+
+```{r}
+lm2 <- lm(food_insecurity_14_21 ~. - GPD_per_cap_14_21 - percent_rural_21, data=numFood)
+summary(lm2)
+```
+
+```{r}
+library(rpart)
+library(rpart.plot)
+Tree = rpart(food_insecurity_14_21 ~., method = "anova", data = numFood)
+prp(Tree)
+```
+
+```{r}
+
+```
+
+```{r}
+
+```
+
+```{r}
+
+```
+
+```{r}
+
+```
+
+```{r}
+
+```
+
+```{r}
+
+```
