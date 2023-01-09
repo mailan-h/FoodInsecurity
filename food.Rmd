@@ -1,133 +1,136 @@
+------------------------------------------------------------------------
 
----
-
-```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = TRUE)
-```
+## Prepare the markdown 
 
 ```{r}
-#install.packages("rpart")
-library(rpart)
-#install.packages("rpart.plot")
-library(rpart.plot)
-```
-
-## R Markdown
-
-```{r}
-
 # Clear All Variables & Clear Screen
 rm(list=ls())
 cat("\014")
 ```
+## Load the data
+
 ```{r}
 # Read in the Data
-setwd("C:/Users/HUE/Desktop/Medium")
+setwd("D:/Desktop/Personal projects/FoodInsecurity")
 food = read.csv("food.csv")
 ```
 
 ```{r}
 #Explore the data set
 food$agriculture_land_per_capita_14_20 = as.numeric(food$agriculture_land_per_capita_14_20)
-#food$population_change_00_21 = as.numeric(food$population_change_00_21)
-#food$percent_rural_21 = as.numeric(food$percent_rural_21)
-#food$forest_change_90_20 = as.numeric(food$forest_change_90_20)
 str(food)
 summary(food)
 ```
-
+## Clustering model
 
 ```{r}
-# Normalization
-
-library(ggplot2)
+# Normalization of data
 library(caret)
 completefood <- na.omit(food) 
 preproc = preProcess(completefood)
 foodNorm = predict(preproc, completefood)
-summary(foodNorm)
 
 # Double check the results of normalization
-#apply(foodNorm,2, mean)
-#apply(foodNorm,2, sd)
+summary(foodNorm)
+apply(foodNorm,2, sd)
 
 ```
 
 ```{r}
-distances = dist(foodNorm[,-1], method="euclidean") # Calculate all pairwise distances between movies
-clusterfood = hclust(distances, method="ward.D") # Ward uses centroid distances between clusters
-plot(clusterfood) # Dendrogram
+# Create clusters and plot Dendrogram
+distances = dist(foodNorm[,-1], method="euclidean")
+clusterfood = hclust(distances, method="ward.D") 
+plot(clusterfood) 
 ```
 
 ```{r}
-clusterGroups = cutree(clusterfood, k=5) #Extract clusters 
+# Cut tree to narrow down to 5 clusters for interpretation
+clusterGroups = cutree(clusterfood, k=5) 
 tapply(completefood$food_insecurity_14_21, clusterGroups, mean)
 table(clusterGroups)
 ```
 
 ```{r}
-
 # Examination of results
 table(clusterGroups) # count number of observations in each cluster
 
 # Calculate mean values (cluster centroids) of all variables using unnormalized data
-#tapply(completefood$food_insecurity_19_21, clusterGroups, mean)
-
-# Alternative way to calculate mean values of all variables by cluster
 summary = aggregate(completefood[, -1], list(clusterGroups), mean)
 summary[order(-summary$food_insecurity_14_21),]
-write.csv(summary, "summary.csv")
-
 ```
 
 ```{r}
+# Examine each cluster
 completefood$clusterGroups <- clusterGroups
+completefood[completefood$clusterGroups == 1,]
+completefood[completefood$clusterGroups == 2,]
+completefood[completefood$clusterGroups == 3,]
 completefood[completefood$clusterGroups == 4,]
+completefood[completefood$clusterGroups == 5,]
 ```
+## Linear regression model
 
 ```{r}
+# Create a dataframe containing numerical variables
 numFood <- completefood[, 2:10]
+
+# Check correlations to identify potential multicolinearity issues
 cor(numFood)
 ```
 
+```{r}
+# Split the dataset into training and testing sets
+library(caTools)
+set.seed(123)
+split = sample.split(numFood$food_insecurity_14_21, SplitRatio = 0.8)
+train = subset(numFood, split==TRUE)
+test = subset(numFood, split==FALSE)
+```
+
 
 ```{r}
-lm1 <- lm(food_insecurity_14_21 ~., data=numFood)
+# Run linear regression model on all variables on the training set
+lm1 <- lm(food_insecurity_14_21 ~., data=train)
 summary(lm1)
 ```
 
 ```{r}
-lm2 <- lm(food_insecurity_14_21 ~. - GPD_per_cap_14_21 - percent_rural_21, data=numFood)
+# Run linear regression model after removing variables that have high correlations with those already included  
+lm2 <- lm(food_insecurity_14_21 ~. - GPD_per_cap_14_21 - percent_rural_21 , data=train)
 summary(lm2)
 ```
+```{r}
+# Evaluate the performance of the model on the test set
+
+# Make predictions on the test set using the linear regression model
+lmPredicted = predict(lm2,newdata = test)
+
+# Calculate out-of-sample R Squared - how well the model performs relative to the baseline model
+lmSSE = sum((test$food_insecurity_14_21 - lmPredicted)^2)
+lmSST = sum((test$food_insecurity_14_21 - mean(train$food_insecurity_14_21))^2)
+1-lmSSE/lmSST
+```
+
+## Regression tree model
 
 ```{r}
+# Develop the regression tree model
 library(rpart)
 library(rpart.plot)
-Tree = rpart(food_insecurity_14_21 ~., method = "anova", data = numFood)
-prp(Tree)
+tree = rpart(food_insecurity_14_21 ~., method = "anova", data = train, minbucket = 10)
+prp(tree)
+rpart.plot(tree)
 ```
 
 ```{r}
+# Evaluate the performance of the model on the test set
 
+# Make predictions on the test set using the regression tree
+cartPredict <-predict(tree, newdata =test)
+
+# Calculate out-of-sample R Squared - how well the model performs relative to the baseline model
+cartSSE = sum((test$food_insecurity_14_21 - cartPredict)^2)
+cartSST = sum((test$food_insecurity_14_21 - mean(train$food_insecurity_14_21))^2)
+1-cartSSE/cartSST
 ```
 
-```{r}
-
-```
-
-```{r}
-
-```
-
-```{r}
-
-```
-
-```{r}
-
-```
-
-```{r}
-
-```
